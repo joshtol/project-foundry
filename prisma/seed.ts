@@ -120,6 +120,65 @@ async function main() {
         },
       });
     }
+
+    // ─── Build BUILD-001 + 5 boards ─────────────────────
+    const now = new Date();
+    const daysAgo = (n: number) => new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
+
+    // Build has no compound-unique in Prisma (raw functional index only).
+    const existingBuild = await tx.build.findFirst({
+      where: { revisionId: revision.id, label: { equals: "BUILD-001", mode: "insensitive" } },
+    });
+    const build = existingBuild
+      ? await tx.build.update({
+          where: { id: existingBuild.id },
+          data: {
+            boardCount: 5,
+            pcbOrderRef: "OSH-1234",
+            partsOrderRef: "DK-5678",
+            orderedAt: daysAgo(10),
+            receivedAt: daysAgo(5),
+            assemblyStartedAt: daysAgo(4),
+            frozenAt: null,
+          },
+        })
+      : await tx.build.create({
+          data: {
+            revisionId: revision.id,
+            label: "BUILD-001",
+            boardCount: 5,
+            pcbOrderRef: "OSH-1234",
+            partsOrderRef: "DK-5678",
+            orderedAt: daysAgo(10),
+            receivedAt: daysAgo(5),
+            assemblyStartedAt: daysAgo(4),
+            createdById: user.id,
+          },
+        });
+
+    for (const serial of ["B01", "B02", "B03", "B04", "B05"]) {
+      // Board uniqueness is raw functional index board_build_serial_ci only.
+      const existingBoard = await tx.board.findFirst({
+        where: { buildId: build.id, serial: { equals: serial, mode: "insensitive" } },
+      });
+      if (existingBoard) {
+        await tx.board.update({
+          where: { id: existingBoard.id },
+          data: { status: "ASSEMBLED", silkscreenHash: "g1ebc1cc" },
+        });
+      } else {
+        await tx.board.create({
+          data: {
+            buildId: build.id,
+            serial,
+            status: "ASSEMBLED",
+            silkscreenHash: "g1ebc1cc",
+          },
+        });
+      }
+    }
+
+    console.log(`seed: build=${build.id}`);
   });
 
   console.log("seed: complete");
