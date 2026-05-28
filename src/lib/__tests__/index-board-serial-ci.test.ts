@@ -31,9 +31,11 @@ beforeAll(async () => {
     VALUES ('${REVISION_ID}', '${PROJECT_ID}', 'board-serial-ci-v1', 'ASSEMBLY', NOW(), NOW(), NOW())
     ON CONFLICT (id) DO NOTHING;
   `);
+  // Insert Build A frozen so the partial unique index
+  // build_one_unfrozen_per_revision allows Build B (unfrozen) on the same Revision.
   await db.$executeRawUnsafe(`
-    INSERT INTO "Build" (id, "revisionId", label, "boardCount", "createdById", "createdAt", "updatedAt")
-    VALUES ('${BUILD_A_ID}', '${REVISION_ID}', 'board-serial-ci-buildA', 3, '${USER_ID}', NOW(), NOW())
+    INSERT INTO "Build" (id, "revisionId", label, "boardCount", "frozenAt", "createdById", "createdAt", "updatedAt")
+    VALUES ('${BUILD_A_ID}', '${REVISION_ID}', 'board-serial-ci-buildA', 3, NOW(), '${USER_ID}', NOW(), NOW())
     ON CONFLICT (id) DO NOTHING;
   `);
   await db.$executeRawUnsafe(`
