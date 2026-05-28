@@ -179,6 +179,65 @@ async function main() {
     }
 
     console.log(`seed: build=${build.id}`);
+
+    // ─── Build-scoped artifacts (NOTE kind only — no R2 needed) ───────
+    // All BRINGUP stage; buildId set, revisionId null (XOR enforced by CHECK).
+    const artifacts = [
+      {
+        subkind: "PCB_ORDER" as const,
+        title: "OSH Park order OSH-1234",
+        noteBody:
+          "Submitted 2026-05-18; 5 boards Rev B; ENIG finish; arrived 2026-05-23.",
+      },
+      {
+        subkind: "PARTS_ORDER" as const,
+        title: "DigiKey order DK-5678",
+        noteBody:
+          "Submitted 2026-05-18; all components for 5 boards; arrived 2026-05-23.",
+      },
+      {
+        subkind: "BRINGUP_LOG" as const,
+        title: "Initial power-on B01",
+        noteBody:
+          "# Initial power-on B01\n\n" +
+          "- Connected USB; observed 5.02 V on VBUS.\n" +
+          "- 3V3 rail at 3.31 V (LDO healthy).\n" +
+          "- ESP32 boot banner OK on serial console.\n" +
+          "- No smoke, no excess current draw.\n",
+      },
+      {
+        subkind: "BRINGUP_COMPLETE" as const,
+        title: "Bring-up complete (seed-injected)",
+        noteBody:
+          "Seed-injected so M7 can demo BRINGUP→REVISION before M8a's Mark complete button ships.",
+      },
+    ];
+
+    for (const a of artifacts) {
+      // Artifact has no compound-unique; key idempotency on (buildId, subkind, title).
+      const existing = await tx.artifact.findFirst({
+        where: { buildId: build.id, subkind: a.subkind, title: a.title },
+      });
+      if (existing) {
+        await tx.artifact.update({
+          where: { id: existing.id },
+          data: { noteBody: a.noteBody, stage: "BRINGUP", kind: "NOTE" },
+        });
+      } else {
+        await tx.artifact.create({
+          data: {
+            buildId: build.id,
+            revisionId: null,
+            stage: "BRINGUP",
+            kind: "NOTE",
+            subkind: a.subkind,
+            title: a.title,
+            noteBody: a.noteBody,
+            createdBy: user.id,
+          },
+        });
+      }
+    }
   });
 
   console.log("seed: complete");
