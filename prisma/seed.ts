@@ -238,6 +238,91 @@ async function main() {
         });
       }
     }
+
+    // ─── Measurements on B01 ────────────────────────────
+    const b01 = await tx.board.findFirst({
+      where: { buildId: build.id, serial: { equals: "B01", mode: "insensitive" } },
+    });
+    if (!b01) throw new Error("seed: expected B01 to exist on BUILD-001");
+
+    const measurements = [
+      {
+        stage: "ASSEMBLY" as const,
+        step: "Step 0c TP1-TP6",
+        expectedValue: "OL",
+        actualValue: "OL",
+        unit: null,
+        result: "PASS" as const,
+        notes:
+          "Screening continuity sweep (bare-board Step 0c) — TP1-TP6 all open as expected.",
+      },
+      {
+        stage: "ASSEMBLY" as const,
+        step: "Step 0d VBUS-GND",
+        expectedValue: "> 2 MΩ",
+        actualValue: "1.8",
+        unit: "MΩ",
+        result: "PASS" as const,
+        notes: "Screening Step 0d VBUS-GND resistance on bare board.",
+      },
+      {
+        stage: "ASSEMBLY" as const,
+        step: "Step 12 +5V-GND post-assembly",
+        expectedValue: "> 1 kΩ",
+        actualValue: "12.4",
+        unit: "kΩ",
+        result: "OBSERVED" as const,
+        notes: "Recorded for trend; no pass/fail adjudication at this step.",
+      },
+      {
+        stage: "BRINGUP" as const,
+        step: "VBUS no-load",
+        expectedValue: "4.95–5.05 V",
+        actualValue: "5.02",
+        unit: "V",
+        result: "PASS" as const,
+        notes: null,
+      },
+      {
+        stage: "BRINGUP" as const,
+        step: "3V3 rail",
+        expectedValue: "3.25–3.35 V",
+        actualValue: "3.31",
+        unit: "V",
+        result: "PASS" as const,
+        notes: null,
+      },
+      {
+        stage: "BRINGUP" as const,
+        step: "ESP32 boot",
+        expectedValue: "console banner",
+        actualValue: "banner OK",
+        unit: null,
+        result: "PASS" as const,
+        notes: "Serial @ 115200 8N1 — boot banner + MAC printed.",
+      },
+    ];
+
+    for (const m of measurements) {
+      // Measurement has no natural unique key; idempotent by (boardId, step).
+      const existing = await tx.measurement.findFirst({
+        where: { boardId: b01.id, step: m.step },
+      });
+      if (existing) continue;
+      await tx.measurement.create({
+        data: {
+          boardId: b01.id,
+          stage: m.stage,
+          step: m.step,
+          expectedValue: m.expectedValue,
+          actualValue: m.actualValue,
+          unit: m.unit,
+          result: m.result,
+          notes: m.notes,
+          measuredById: user.id,
+        },
+      });
+    }
   });
 
   console.log("seed: complete");
