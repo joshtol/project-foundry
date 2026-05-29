@@ -124,3 +124,90 @@ export async function createProjectFormAction(
   // Outside the try so Next.js's redirect-throw isn't swallowed by the catch.
   redirect(`/projects/${createdSlug}`);
 }
+
+// Edit-in-place wrappers for the detail page. Each one accepts the project
+// id (via hidden input) plus exactly one editable field. They route through
+// editProject for validation + audit, then revalidate.
+//
+// On Zod failure, the field error is surfaced via useActionState state;
+// otherwise the action completes silently (the revalidate is what refreshes
+// the page).
+
+async function editProjectSingleField(
+  fieldName: "name" | "description" | "repoUrl" | "targetCost",
+  formData: FormData,
+): Promise<ProjectFormState> {
+  const id = formData.get("id");
+  if (typeof id !== "string" || id.length === 0) {
+    return { message: "Missing project id" };
+  }
+  const raw = pickString(formData, fieldName);
+  // null sentinel: empty value clears optional nullable fields.
+  const value =
+    fieldName === "name"
+      ? raw
+      : raw === undefined
+        ? null
+        : raw;
+
+  try {
+    await editProject({ id, [fieldName]: value });
+    return {};
+  } catch (err) {
+    if (err instanceof ZodError) {
+      const errors: Record<string, string[]> = {};
+      for (const issue of err.issues) {
+        const key = issue.path.join(".") || "_root";
+        (errors[key] ??= []).push(issue.message);
+      }
+      return { errors };
+    }
+    return { message: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
+export async function editProjectNameAction(
+  _prev: ProjectFormState,
+  formData: FormData,
+): Promise<ProjectFormState> {
+  return editProjectSingleField("name", formData);
+}
+
+export async function editProjectDescriptionAction(
+  _prev: ProjectFormState,
+  formData: FormData,
+): Promise<ProjectFormState> {
+  return editProjectSingleField("description", formData);
+}
+
+export async function editProjectRepoUrlAction(
+  _prev: ProjectFormState,
+  formData: FormData,
+): Promise<ProjectFormState> {
+  return editProjectSingleField("repoUrl", formData);
+}
+
+export async function editProjectTargetCostAction(
+  _prev: ProjectFormState,
+  formData: FormData,
+): Promise<ProjectFormState> {
+  return editProjectSingleField("targetCost", formData);
+}
+
+export async function archiveProjectAction(formData: FormData): Promise<void> {
+  const id = formData.get("id");
+  if (typeof id !== "string" || id.length === 0) {
+    throw new Error("Missing project id");
+  }
+  await archiveProject(id);
+}
+
+export async function unarchiveProjectAction(
+  formData: FormData,
+): Promise<void> {
+  const id = formData.get("id");
+  if (typeof id !== "string" || id.length === 0) {
+    throw new Error("Missing project id");
+  }
+  await unarchiveProject(id);
+}
