@@ -26,6 +26,7 @@ import {
   BuildReceivedAtField,
 } from "./_header-fields";
 import { ArtifactPicker } from "@/components/ArtifactPicker";
+import { BoardsTable } from "@/components/BoardsTable";
 import { MarkBringupCompleteButton } from "@/components/MarkBringupCompleteButton";
 
 type Params = { slug: string; revLabel: string; buildLabel: string };
@@ -241,43 +242,14 @@ export default async function BuildDetailPage({
 
       {/* Two-column grid — design §9.2 */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* LEFT 2/3 — Boards */}
+        {/* LEFT 2/3 — Boards (Task 12.3 / Phase 12 / M9a). */}
         <div className="space-y-6 lg:col-span-2">
-          <section className="border border-panel-border bg-navy-dark p-6">
-            <h2 className="font-display text-2xl tracking-wider text-white">
-              BOARDS
-            </h2>
-            {build.boards.length === 0 ? (
-              <p className="mt-4 font-mono text-xs uppercase tracking-wider text-muted">
-                NO BOARDS YET.
-              </p>
-            ) : (
-              <ul className="mt-4 divide-y divide-panel-border">
-                {build.boards.map((b) => (
-                  <li
-                    key={b.id}
-                    className="grid grid-cols-12 items-baseline gap-2 py-3 font-mono text-sm"
-                  >
-                    <span className="col-span-2 text-command-gold">
-                      {b.serial}
-                    </span>
-                    <span className="col-span-4 text-muted">
-                      {b.silkscreenHash ?? "—"}
-                    </span>
-                    <span className="col-span-3 text-link-muted">
-                      {b.status}
-                    </span>
-                    <span className="col-span-3 text-muted">
-                      {isoDate(b.updatedAt)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="mt-4 font-mono text-xs uppercase tracking-wider text-muted">
-              Register-board flow ships in Phase 12 (M9a).
-            </p>
-          </section>
+          <BoardsTable
+            boards={build.boards}
+            buildBaseHref={`/projects/${project.slug}/${encodeURIComponent(
+              revision.label,
+            )}/builds/${encodeURIComponent(build.label)}`}
+          />
         </div>
 
         {/* RIGHT 1/3 — Build artifacts + checklists */}
