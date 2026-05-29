@@ -120,8 +120,8 @@ export function MeasurementsLog({
       </div>
 
       {measurements.length === 0 ? (
-        <p className="mt-6 font-mono text-xs uppercase tracking-wider text-muted">
-          NO MEASUREMENTS YET.
+        <p className="mt-6 font-mono text-sm uppercase tracking-wider text-muted">
+          NO MEASUREMENTS — ADD ONE ABOVE.
         </p>
       ) : (
         <div className="mt-6 space-y-6">

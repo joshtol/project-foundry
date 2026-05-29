@@ -230,8 +230,8 @@ export default async function RevisionDetailPage({
               ) : null}
             </div>
             {revision.builds.length === 0 ? (
-              <p className="mt-4 font-mono text-xs uppercase tracking-wider text-muted">
-                NO BUILDS YET.
+              <p className="mt-4 font-mono text-sm uppercase tracking-wider text-muted">
+                NO BUILDS — CREATE ONE WHEN THE REVISION REACHES DRC_GERBER.
               </p>
             ) : (
               <ul className="mt-4 divide-y divide-panel-border">

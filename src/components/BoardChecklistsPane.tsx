@@ -67,8 +67,8 @@ export function BoardChecklistsPane({
       </div>
 
       {checklists.length === 0 ? (
-        <p className="mt-4 font-mono text-xs uppercase tracking-wider text-muted">
-          NO CHECKLISTS YET.
+        <p className="mt-4 font-mono text-sm uppercase tracking-wider text-muted">
+          NO CHECKLISTS — CREATE ONE TO BEGIN.
         </p>
       ) : (
         <ul className="mt-4 divide-y divide-panel-border">

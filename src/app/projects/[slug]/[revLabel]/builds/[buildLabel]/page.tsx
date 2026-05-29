@@ -268,8 +268,8 @@ export default async function BuildDetailPage({
               </span>
             </div>
             {build.artifacts.length === 0 ? (
-              <p className="mt-4 font-mono text-xs uppercase tracking-wider text-muted">
-                NO ARTIFACTS YET.
+              <p className="mt-4 font-mono text-sm uppercase tracking-wider text-muted">
+                NO ARTIFACTS — ADD ONE BELOW.
               </p>
             ) : (
               <ul className="mt-4 divide-y divide-panel-border">

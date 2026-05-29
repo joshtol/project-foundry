@@ -87,8 +87,8 @@ export function BoardsTable({
       </div>
 
       {boards.length === 0 ? (
-        <p className="mt-4 font-mono text-xs uppercase tracking-wider text-muted">
-          NO BOARDS YET.
+        <p className="mt-4 font-mono text-sm uppercase tracking-wider text-muted">
+          NO BOARDS — REGISTER ONE TO BEGIN.
         </p>
       ) : (
         <div className="mt-4 overflow-x-auto">

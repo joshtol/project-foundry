@@ -180,6 +180,6 @@ describe("TransitionsLog", () => {
   test("empty list renders placeholder", () => {
     const tree = TransitionsLog({ transitions: [] });
     const text = textOf(tree as ReactNode);
-    expect(text).toMatch(/NO TRANSITIONS YET\./);
+    expect(text).toMatch(/NO TRANSITIONS — ADVANCE THE STAGE TO BEGIN\./);
   });
 });

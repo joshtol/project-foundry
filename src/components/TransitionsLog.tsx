@@ -67,8 +67,8 @@ export function TransitionsLog({
 }) {
   if (transitions.length === 0) {
     return (
-      <p className="font-mono text-xs uppercase tracking-wider text-muted">
-        NO TRANSITIONS YET.
+      <p className="font-mono text-sm uppercase tracking-wider text-muted">
+        NO TRANSITIONS — ADVANCE THE STAGE TO BEGIN.
       </p>
     );
   }
