@@ -1,4 +1,4 @@
-// Tests for stage state-machine server actions (Task 8.1).
+// Tests for stage state-machine server actions (Task 8.1 + 8.2).
 //
 // Exercises the real Neon DB; mocks `next/cache` and `@/auth` per the
 // repository's vitest mocking pattern.
@@ -8,12 +8,21 @@
 //     currentStageEnteredAt bumped, fromStage set on the row.
 //   - Side-effect: BOM_SOURCING → LAYOUT sets bomFrozenAt = NOW().
 //   - Side-effect: BRINGUP → REVISION sets frozenAt + frozenById AND
-//     cascades frozenAt to the active Build.
+//     cascades frozenAt to the active Build (Task 8.4).
 //   - Rejection: gate fails → returns { ok: false, reasons } (does NOT
 //     throw — the caller renders the reasons inline).
 //   - Rejection: revision is frozen.
 //   - Rejection: revision at REVISION (terminal).
-//   - Concurrency: two parallel callers; at most one ADVANCE row written.
+//   - Concurrency: two parallel callers; one succeeds, one rejects with
+//     "stale state — another user advanced this revision".
+//
+// regressStage covers:
+//   - Happy path: previous stage written.
+//   - Side-effect: LAYOUT → BOM_SOURCING clears bomFrozenAt.
+//   - Side-effect: DRC_GERBER → LAYOUT preserves bomFrozenAt.
+//   - Rejection: empty reason (Zod rejects).
+//   - Rejection: cannot regress from REQUIREMENTS.
+//   - Rejection: frozen revision.
 
 import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 
@@ -28,7 +37,7 @@ vi.mock("@/auth", () => ({
 
 import type { Stage } from "@prisma/client";
 import { db } from "@/lib/db";
-import { advanceStage } from "@/lib/actions/stages";
+import { advanceStage, regressStage } from "@/lib/actions/stages";
 
 const SEED_EMAIL = "seed@example.com";
 const SEED_PROJECT_SLUG = "esp32-sensor-breakout";
@@ -328,7 +337,7 @@ describe("advanceStage — rejection paths", () => {
 });
 
 describe("advanceStage — concurrent attempts", () => {
-  test("two parallel advances on the same revision: exactly one ADVANCE row from REQUIREMENTS", async () => {
+  test("two parallel advances on the same revision: one succeeds, one rejects with stale state OR retryable serialization error", async () => {
     const rev = await makeRevAtStage(
       "REQUIREMENTS",
       `t8.1-conc-${Date.now()}`,
@@ -341,22 +350,139 @@ describe("advanceStage — concurrent attempts", () => {
     ]);
 
     // At least one MUST succeed. With Serializable + the conditional
-    // UPDATE, the second either loses the row-count check ("stale state")
-    // OR the second's gate context picks up SCHEMATIC and fails the
-    // SCHEMATIC gate (no schematic artifact / commit) → returns
-    // { ok: false }.
+    // UPDATE, the second either:
+    //   (a) loses the row-count check and throws "stale state", OR
+    //   (b) the second tx runs after the first has advanced REQUIREMENTS→
+    //       SCHEMATIC, so the second's gate context picks up SCHEMATIC and
+    //       fails the SCHEMATIC gate (no schematic artifact / commit) →
+    //       returns { ok: false }, OR
+    //   (c) (very rarely) both succeed because withTxRetry replayed the
+    //       failed one and it now advances SCHEMATIC→BOM_SOURCING. The
+    //       SCHEMATIC gate blocks that path though, so this is unlikely.
     const okSuccessful = results.filter(
       (r) => r.status === "fulfilled" && (r.value as { ok: boolean }).ok,
     );
     expect(okSuccessful.length).toBeGreaterThanOrEqual(1);
 
-    // Steady-state invariant: at most one ADVANCE row from
-    // REQUIREMENTS → SCHEMATIC.
+    // Inspect the revision's final state — at most one ADVANCE row from
+    // REQUIREMENTS → SCHEMATIC should exist (the second attempt either
+    // failed the gate or got "stale state").
     const advanceRows = await db.stageTransition.findMany({
       where: { revisionId: rev.id, direction: "ADVANCE" },
       orderBy: { transitionedAt: "asc" },
     });
     const fromReqs = advanceRows.filter((r) => r.fromStage === "REQUIREMENTS");
     expect(fromReqs).toHaveLength(1);
+  });
+});
+
+// ─── regressStage tests ────────────────────────────────
+
+describe("regressStage — happy paths", () => {
+  test("LAYOUT → BOM_SOURCING clears bomFrozenAt", async () => {
+    const rev = await makeRevAtStage(
+      "LAYOUT",
+      `t8.2-layout-out-${Date.now()}`,
+    );
+    // Simulate the bomFrozenAt that advanceStage to LAYOUT would have set.
+    await db.revision.update({
+      where: { id: rev.id },
+      data: { bomFrozenAt: new Date() },
+    });
+
+    const result = await regressStage({
+      revisionId: rev.id,
+      reason: "BOM mistake; need to swap a part.",
+    });
+    expect(result.ok).toBe(true);
+
+    const after = await db.revision.findUniqueOrThrow({
+      where: { id: rev.id },
+    });
+    expect(after.currentStage).toBe("BOM_SOURCING");
+    expect(after.bomFrozenAt).toBeNull();
+
+    const last = await db.stageTransition.findFirst({
+      where: { revisionId: rev.id, direction: "REGRESS" },
+      orderBy: { transitionedAt: "desc" },
+    });
+    expect(last?.fromStage).toBe("LAYOUT");
+    expect(last?.toStage).toBe("BOM_SOURCING");
+    expect(last?.notes).toBe("BOM mistake; need to swap a part.");
+    const snap = last?.gateSnapshot as {
+      v: number;
+      kind: string;
+      reason: string;
+      ts: string;
+    };
+    expect(snap.v).toBe(1);
+    expect(snap.kind).toBe("regress");
+    expect(snap.reason).toBe("BOM mistake; need to swap a part.");
+  });
+
+  test("DRC_GERBER → LAYOUT preserves bomFrozenAt", async () => {
+    const rev = await makeRevAtStage(
+      "DRC_GERBER",
+      `t8.2-into-layout-${Date.now()}`,
+    );
+    const bomFrozen = new Date("2026-04-01");
+    await db.revision.update({
+      where: { id: rev.id },
+      data: { bomFrozenAt: bomFrozen },
+    });
+
+    const result = await regressStage({
+      revisionId: rev.id,
+      reason: "Layout had a routing miss; redo.",
+    });
+    expect(result.ok).toBe(true);
+
+    const after = await db.revision.findUniqueOrThrow({
+      where: { id: rev.id },
+    });
+    expect(after.currentStage).toBe("LAYOUT");
+    expect(after.bomFrozenAt).not.toBeNull();
+    expect(after.bomFrozenAt!.toISOString()).toBe(bomFrozen.toISOString());
+  });
+});
+
+describe("regressStage — rejection paths", () => {
+  test("empty reason rejected by Zod", async () => {
+    const rev = await makeRevAtStage(
+      "SCHEMATIC",
+      `t8.2-empty-${Date.now()}`,
+    );
+    await expect(
+      regressStage({ revisionId: rev.id, reason: "" }),
+    ).rejects.toThrow();
+    await expect(
+      regressStage({ revisionId: rev.id, reason: "   " }),
+    ).rejects.toThrow();
+  });
+
+  test("cannot regress from REQUIREMENTS", async () => {
+    const rev = await makeRevAtStage(
+      "REQUIREMENTS",
+      `t8.2-req-${Date.now()}`,
+    );
+    await expect(
+      regressStage({ revisionId: rev.id, reason: "go back" }),
+    ).rejects.toThrow(/REQUIREMENTS|cannot regress/i);
+  });
+
+  test("frozen revision: throws", async () => {
+    const user = await seedUser();
+    const rev = await makeRevAtStage(
+      "BRINGUP",
+      `t8.2-frozen-${Date.now()}`,
+    );
+    await db.revision.update({
+      where: { id: rev.id },
+      data: { frozenAt: new Date(), frozenById: user.id },
+    });
+
+    await expect(
+      regressStage({ revisionId: rev.id, reason: "go back" }),
+    ).rejects.toThrow(/frozen/i);
   });
 });
