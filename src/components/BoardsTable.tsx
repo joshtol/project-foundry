@@ -96,9 +96,14 @@ export function BoardsTable({
             <thead>
               <tr className="border-b border-panel-border text-left text-xs uppercase tracking-wider text-muted">
                 <th className="py-2 pr-3 font-normal">Serial</th>
-                <th className="py-2 pr-3 font-normal">Silkscreen</th>
+                {/* Silkscreen + last-touched hidden at < md per Task 15.5. */}
+                <th className="hidden py-2 pr-3 font-normal md:table-cell">
+                  Silkscreen
+                </th>
                 <th className="py-2 pr-3 font-normal">Status</th>
-                <th className="py-2 font-normal">Last touched</th>
+                <th className="hidden py-2 font-normal md:table-cell">
+                  Last touched
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-panel-border">
@@ -112,13 +117,13 @@ export function BoardsTable({
                       {b.serial}
                     </Link>
                   </td>
-                  <td className="py-3 pr-3 text-muted">
+                  <td className="hidden py-3 pr-3 text-muted md:table-cell">
                     {truncateHash(b.silkscreenHash)}
                   </td>
                   <td className="py-3 pr-3">
                     <StatusPill status={b.status} />
                   </td>
-                  <td className="py-3 text-muted">
+                  <td className="hidden py-3 text-muted md:table-cell">
                     {formatLastTouched(b.updatedAt)}
                   </td>
                 </tr>
