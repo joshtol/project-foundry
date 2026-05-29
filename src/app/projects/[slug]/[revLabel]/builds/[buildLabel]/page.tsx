@@ -26,6 +26,7 @@ import {
   BuildReceivedAtField,
 } from "./_header-fields";
 import { ArtifactPicker } from "@/components/ArtifactPicker";
+import { MarkBringupCompleteButton } from "@/components/MarkBringupCompleteButton";
 
 type Params = { slug: string; revLabel: string; buildLabel: string };
 
@@ -78,6 +79,21 @@ export default async function BuildDetailPage({
   // unfrozen Build *is* the active Build — no extra lookup needed.
   const isActive = !buildIsFrozen;
   const goldAccent = isActive && !revIsFrozen;
+
+  // "Mark bring-up complete" visibility (design §9.2): parent rev at
+  // BRINGUP, this Build is active+unfrozen, no BRINGUP_COMPLETE yet.
+  // Disabled state: any board's status ∉ {BROUGHT_UP, QUARANTINED}.
+  const hasBringupComplete = build.artifacts.some(
+    (a) => a.subkind === "BRINGUP_COMPLETE",
+  );
+  const showMarkComplete =
+    revision.currentStage === "BRINGUP" &&
+    isActive &&
+    !revIsFrozen &&
+    !hasBringupComplete;
+  const blockingSerials = build.boards
+    .filter((b) => !["BROUGHT_UP", "QUARANTINED"].includes(b.status))
+    .map((b) => b.serial);
   // Edits are gated by both the Build's freeze and its parent's. We mirror
   // the assertion-helper semantics so the disabled UI matches what the
   // server would refuse anyway.
@@ -139,15 +155,16 @@ export default async function BuildDetailPage({
             >
               {buildIsFrozen ? "FROZEN" : "ACTIVE"}
             </span>
-            {/* "Mark bring-up complete" placeholder — wired in M8a. */}
-            <button
-              type="button"
-              disabled
-              title="Wired in Phase 9 (M8a)."
-              className="rounded border border-panel-border bg-deep-space px-3 py-1 font-mono text-xs uppercase tracking-wider text-muted opacity-60"
-            >
-              Mark bring-up complete
-            </button>
+            {/* "Mark bring-up complete" — design §9.2.
+                Visibility computed above (parent rev at BRINGUP + active +
+                no prior BRINGUP_COMPLETE). Enabled/disabled state computed
+                from boards status + truncated tooltip per §9.2. */}
+            {showMarkComplete ? (
+              <MarkBringupCompleteButton
+                buildId={build.id}
+                blockingSerials={blockingSerials}
+              />
+            ) : null}
           </div>
         </div>
 
