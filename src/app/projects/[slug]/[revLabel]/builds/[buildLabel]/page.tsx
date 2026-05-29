@@ -123,7 +123,19 @@ export default async function BuildDetailPage({
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
-            <span className="rounded border border-panel-border bg-navy-dark px-2 py-0.5 font-mono text-xs uppercase tracking-wider text-command-gold">
+            {/*
+              FROZEN badge per design §8.3 (Task 8.4): Space Mono caps,
+              alert-red outlined pill on navy-dark — semantically distinct
+              from the gold "ACTIVE" pill so the cascade from revision
+              freeze is visible at a glance.
+            */}
+            <span
+              className={`rounded bg-navy-dark px-2 py-0.5 font-mono text-xs uppercase tracking-wider ${
+                buildIsFrozen
+                  ? "border border-alert-red text-alert-red"
+                  : "border border-panel-border text-command-gold"
+              }`}
+            >
               {buildIsFrozen ? "FROZEN" : "ACTIVE"}
             </span>
             {/* "Mark bring-up complete" placeholder — wired in M8a. */}
