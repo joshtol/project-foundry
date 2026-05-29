@@ -112,7 +112,12 @@ export default async function ProjectDetailPage({
                 key={r.id}
                 className="flex items-baseline justify-between gap-4 px-4 py-3 font-mono text-sm"
               >
-                <span className="text-command-gold">{r.label}</span>
+                <Link
+                  href={`/projects/${project.slug}/${encodeURIComponent(r.label)}`}
+                  className="text-command-gold underline"
+                >
+                  {r.label}
+                </Link>
                 <span className="text-muted">
                   {r.currentStage} · updated{" "}
                   {r.updatedAt.toISOString().slice(0, 10)}
