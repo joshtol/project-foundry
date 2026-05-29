@@ -8,12 +8,13 @@ import { config as loadEnv } from "dotenv";
 // Load .env.local before importing anything that reads process.env.DATABASE_URL.
 loadEnv({ path: ".env.local" });
 
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
 async function main() {
   console.log("seed: starting");
 
-  await db.$transaction(async (tx) => {
+  await db.$transaction(async (tx: Prisma.TransactionClient) => {
     const user = await tx.user.upsert({
       where: { email: "seed@example.com" },
       update: {},
