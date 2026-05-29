@@ -12,7 +12,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { STAGE_LABELS, STAGE_ORDER, type StageName } from "@/lib/stages";
+import { type StageName } from "@/lib/stages";
+import { loadGateContext } from "@/lib/load-gate-context";
+import { StageTracker } from "@/components/StageTracker";
 import { TransitionsLog } from "@/components/TransitionsLog";
 import {
   EditLayoutCommitForm,
@@ -60,7 +62,11 @@ export default async function RevisionDetailPage({
   if (!revision) notFound();
 
   const isFrozen = revision.frozenAt !== null;
-  const currentIdx = STAGE_ORDER.indexOf(revision.currentStage as StageName);
+
+  // Gate context for the StageTracker (Phase 7). Loaded server-side so the
+  // tracker stays a pure render; same loader the advanceStage action will
+  // reuse inside its Serializable tx in Phase 8.
+  const gateCtx = await loadGateContext(db, revision.id);
 
   // "Create new Build" gating (design §9.1): mirror createBuild's stage
   // assertion AND the Phase 1 one-unfrozen-Build-per-revision invariant.
@@ -164,29 +170,12 @@ export default async function RevisionDetailPage({
         </div>
       </div>
 
-      {/* Stage tracker stub — read-only; Phase 7 wires gate state */}
-      <div className="mt-6 overflow-x-auto border border-panel-border bg-navy-dark p-4">
-        <ol className="flex min-w-max items-stretch gap-2">
-          {STAGE_ORDER.map((stage, idx) => {
-            const isActive = idx === currentIdx;
-            const isCompleted = idx < currentIdx;
-            const cls = isActive
-              ? "border-command-gold bg-command-gold text-deep-space"
-              : isCompleted
-                ? "border-command-gold text-command-gold"
-                : "border-panel-border text-muted";
-            return (
-              <li
-                key={stage}
-                className={`min-w-[110px] rounded border px-3 py-2 font-mono text-xs uppercase tracking-wider ${cls}`}
-              >
-                <span className="block">
-                  {String(idx + 1).padStart(2, "0")} / {STAGE_LABELS[stage]}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
+      {/* Stage tracker — read-only; gates evaluated server-side (Phase 7) */}
+      <div className="mt-6">
+        <StageTracker
+          revision={{ currentStage: revision.currentStage }}
+          ctx={gateCtx}
+        />
       </div>
 
       {/* Two-column grid — design §9.1 */}
