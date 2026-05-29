@@ -22,15 +22,11 @@ import { requireUser } from "@/lib/auth-helpers";
 import { withTxRetry } from "@/lib/tx-retry";
 import {
   createErratumSchema,
+  CROSS_PROJECT_ERRATUM_MSG,
   deleteErratumSchema,
   editErratumSchema,
   linkErratumSchema,
 } from "@/lib/schemas/erratum";
-
-// Canonical rejection message for cross-project link attempts. Lives as a
-// const so the test can assert on the literal string.
-export const CROSS_PROJECT_ERRATUM_MSG =
-  "Errata can only address revisions within the same project.";
 
 async function loadRevisionRoute(
   tx: Prisma.TransactionClient,

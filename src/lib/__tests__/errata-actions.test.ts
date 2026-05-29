@@ -31,11 +31,11 @@ vi.mock("@/auth", () => ({
 import { db } from "@/lib/db";
 import {
   createErratum,
-  CROSS_PROJECT_ERRATUM_MSG,
   deleteErratum,
   editErratum,
   linkErratumToRevision,
 } from "@/lib/actions/errata";
+import { CROSS_PROJECT_ERRATUM_MSG } from "@/lib/schemas/erratum";
 
 const SEED_EMAIL = "seed@example.com";
 const SEED_PROJECT_SLUG = "esp32-sensor-breakout";

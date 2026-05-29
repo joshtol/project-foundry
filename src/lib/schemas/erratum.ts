@@ -1,4 +1,5 @@
-// Zod 4 schemas for Erratum CRUD (design §4.2, §5.3 post-freeze write path).
+// Zod 4 schemas + shared constants for Erratum CRUD (design §4.2, §5.3
+// post-freeze write path).
 //
 // Errata are the ONE write path that survives the revision freeze: per design
 // §5.3, "Erratum CRUD bypasses all three" assertion helpers (assertNotFrozen,
@@ -12,6 +13,13 @@
 // (no DB CHECK — design §12.1 trapdoor list explicitly trades this off).
 import { z } from "zod";
 import { ErratumSeverity, ErratumStatus } from "@prisma/client";
+
+// Canonical rejection message for cross-project address-by link attempts.
+// Lives here (non-"use server" module) so client code + tests can import
+// the literal string without triggering Next's server-action export-shape
+// check (which rejects non-async const exports from "use server" files).
+export const CROSS_PROJECT_ERRATUM_MSG =
+  "Errata can only address revisions within the same project.";
 
 export const createErratumSchema = z.object({
   revisionId: z.cuid(),
