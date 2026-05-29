@@ -1,9 +1,9 @@
 // Freeze-policy assertion helpers (design §5.3).
 //
-// Phase 5a uses `assertNotFrozen` and `assertBomNotFrozen` from BomLine /
-// commit-SHA write paths. `assertBuildNotFrozen` is stubbed here so its
-// import target is stable; Phase 6 wires up the Build-CRUD callers, and
-// Phase 8 wires the Build-scoped artifact writers.
+// Phase 5a wired `assertNotFrozen` and `assertBomNotFrozen` for the BomLine /
+// commit-SHA write paths. Phase 6 / M5b wires `assertBuildNotFrozen` for the
+// Build-CRUD callers (editBuild); Phase 8 will reuse it for the Build-scoped
+// artifact / checklist / measurement writers.
 //
 // Each helper takes a Prisma transaction client so they can run inside the
 // Serializable transaction the action layer opens. Throwing here aborts
