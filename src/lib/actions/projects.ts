@@ -15,6 +15,8 @@ import {
   editProjectSchema,
 } from "@/lib/schemas/project";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { ZodError } from "zod";
 
 export async function createProject(input: unknown) {
   const data = createProjectSchema.parse(input);
@@ -72,4 +74,53 @@ export async function unarchiveProject(id: string) {
     data: { archivedAt: null },
   });
   revalidatePath("/");
+}
+
+// ─── Form action wrappers (useActionState-compatible) ──────────────────
+// React 19 / Next 16 form actions receive (prevState, formData) and return
+// the next state. We adapt FormData → parsed input here so the page-level
+// client component can drive form rendering without re-implementing Zod.
+
+export type ProjectFormState = {
+  errors?: Record<string, string[]>;
+  message?: string;
+};
+
+function pickString(fd: FormData, key: string): string | undefined {
+  const v = fd.get(key);
+  if (typeof v !== "string") return undefined;
+  const trimmed = v.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+export async function createProjectFormAction(
+  _prev: ProjectFormState,
+  formData: FormData,
+): Promise<ProjectFormState> {
+  const raw = {
+    slug: pickString(formData, "slug"),
+    name: pickString(formData, "name"),
+    description: pickString(formData, "description"),
+    repoUrl: pickString(formData, "repoUrl"),
+    targetCost: pickString(formData, "targetCost"),
+  };
+
+  let createdSlug: string;
+  try {
+    const project = await createProject(raw);
+    createdSlug = project.slug;
+  } catch (err) {
+    if (err instanceof ZodError) {
+      const errors: Record<string, string[]> = {};
+      for (const issue of err.issues) {
+        const key = issue.path.join(".") || "_root";
+        (errors[key] ??= []).push(issue.message);
+      }
+      return { errors };
+    }
+    return { message: err instanceof Error ? err.message : "Unknown error" };
+  }
+
+  // Outside the try so Next.js's redirect-throw isn't swallowed by the catch.
+  redirect(`/projects/${createdSlug}`);
 }
