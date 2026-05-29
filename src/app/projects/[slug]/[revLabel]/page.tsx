@@ -22,6 +22,7 @@ import {
   EditSchematicCommitForm,
 } from "./_commit-fields";
 import { BomEditor } from "./_bom-editor";
+import { ArtifactPicker } from "@/components/ArtifactPicker";
 
 type Params = { slug: string; revLabel: string };
 
@@ -241,13 +242,13 @@ export default async function RevisionDetailPage({
             )}
           </section>
 
-          {/* Artifacts pane (stage filter is a stub for Phase 5a) */}
+          {/* Artifacts pane (design §9.1). Revision-scoped artifacts only;
+              the per-stage subkind picker is mounted below the list. */}
           <section className="border border-panel-border bg-navy-dark p-6">
             <div className="flex items-center justify-between gap-4">
               <h2 className="font-display text-2xl tracking-wider text-white">
                 ARTIFACTS
               </h2>
-              {/* Stage selector stub — wired in Phase 8 */}
               <span className="font-mono text-xs uppercase tracking-wider text-muted">
                 Stage · {revision.currentStage}
               </span>
@@ -284,11 +285,59 @@ export default async function RevisionDetailPage({
                   }
                 />
               </div>
-            ) : (
-              <p className="mt-4 font-mono text-xs uppercase tracking-wider text-muted">
-                NO ARTIFACTS AT THIS STAGE.
-              </p>
-            )}
+            ) : null}
+
+            {/* Revision-scoped artifacts at the current stage. */}
+            {(() => {
+              const revArtifacts = revision.artifacts.filter(
+                (a) =>
+                  a.buildId === null &&
+                  a.stage === revision.currentStage,
+              );
+              if (revArtifacts.length === 0) {
+                return (
+                  <p className="mt-4 font-mono text-xs uppercase tracking-wider text-muted">
+                    NO ARTIFACTS AT THIS STAGE.
+                  </p>
+                );
+              }
+              return (
+                <ul className="mt-4 divide-y divide-panel-border">
+                  {revArtifacts.map((a) => (
+                    <li key={a.id} className="py-3 font-mono text-sm">
+                      <p className="text-link-muted">{a.title}</p>
+                      <p className="mt-1 font-mono text-xs uppercase tracking-wider text-muted">
+                        {a.subkind} · {a.kind}
+                      </p>
+                      {a.linkUrl ? (
+                        <a
+                          href={a.linkUrl}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="mt-1 inline-block font-mono text-xs text-link-muted underline"
+                        >
+                          {a.linkUrl}
+                        </a>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+
+            {/* Add-artifact picker (design §9.1) — scoped to the current
+                stage's revisionAllowedArtifactSubkinds. Hidden when frozen. */}
+            {!isFrozen ? (
+              <div className="mt-6 border-t border-panel-border pt-6">
+                <p className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">
+                  Add artifact
+                </p>
+                <ArtifactPicker
+                  owner={{ kind: "revision", id: revision.id }}
+                  stage={revision.currentStage}
+                />
+              </div>
+            ) : null}
           </section>
         </div>
 

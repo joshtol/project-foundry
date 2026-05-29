@@ -25,6 +25,7 @@ import {
   BuildPcbOrderRefField,
   BuildReceivedAtField,
 } from "./_header-fields";
+import { ArtifactPicker } from "@/components/ArtifactPicker";
 
 type Params = { slug: string; revLabel: string; buildLabel: string };
 
@@ -52,7 +53,7 @@ export default async function BuildDetailPage({
       projectId: project.id,
       label: { equals: decodedRev, mode: "insensitive" },
     },
-    select: { id: true, label: true, frozenAt: true },
+    select: { id: true, label: true, frozenAt: true, currentStage: true },
   });
   if (!revision) notFound();
 
@@ -265,9 +266,14 @@ export default async function BuildDetailPage({
         {/* RIGHT 1/3 — Build artifacts + checklists */}
         <div className="space-y-6">
           <section className="border border-panel-border bg-navy-dark p-6">
-            <h2 className="font-display text-2xl tracking-wider text-white">
-              BUILD ARTIFACTS
-            </h2>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="font-display text-2xl tracking-wider text-white">
+                BUILD ARTIFACTS
+              </h2>
+              <span className="font-mono text-xs uppercase tracking-wider text-muted">
+                Stage · {revision.currentStage}
+              </span>
+            </div>
             {build.artifacts.length === 0 ? (
               <p className="mt-4 font-mono text-xs uppercase tracking-wider text-muted">
                 NO ARTIFACTS YET.
@@ -280,13 +286,35 @@ export default async function BuildDetailPage({
                     <p className="mt-1 font-mono text-xs uppercase tracking-wider text-muted">
                       {a.subkind} · {a.kind} · {isoDate(a.createdAt)}
                     </p>
+                    {a.linkUrl ? (
+                      <a
+                        href={a.linkUrl}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="mt-1 inline-block font-mono text-xs text-link-muted underline"
+                      >
+                        {a.linkUrl}
+                      </a>
+                    ) : null}
                   </li>
                 ))}
               </ul>
             )}
-            <p className="mt-4 font-mono text-xs uppercase tracking-wider text-muted">
-              Add-artifact form ships in Phase 9 (M8a).
-            </p>
+
+            {/* Add-artifact picker (design §9.2) — scoped to the parent
+                revision's current stage's buildAllowedArtifactSubkinds.
+                BRINGUP_COMPLETE is never in the picker — design §9.2. */}
+            {!editsDisabled ? (
+              <div className="mt-6 border-t border-panel-border pt-6">
+                <p className="mb-3 font-mono text-xs uppercase tracking-wider text-muted">
+                  Add artifact
+                </p>
+                <ArtifactPicker
+                  owner={{ kind: "build", id: build.id }}
+                  stage={revision.currentStage}
+                />
+              </div>
+            ) : null}
           </section>
 
           <section className="border border-panel-border bg-navy-dark p-6">

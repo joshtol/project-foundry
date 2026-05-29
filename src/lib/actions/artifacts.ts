@@ -31,9 +31,10 @@
 // with `sanitize-html` (markdown source) at write time — see `sanitizeNote`
 // below for the strict allow-list.
 
-import { Prisma } from "@prisma/client";
+import { ArtifactKind, ArtifactSubkind, Prisma, Stage } from "@prisma/client";
 import sanitizeHtml from "sanitize-html";
 import { revalidatePath } from "next/cache";
+import { ZodError } from "zod";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/auth-helpers";
 import { assertBuildNotFrozen, assertNotFrozen } from "@/lib/assertions";
@@ -294,4 +295,82 @@ export async function deleteArtifact(input: unknown) {
   }
 
   return { ok: true as const };
+}
+
+// ─── Form action wrappers (useActionState-compatible) ──────────────────
+
+export type ArtifactFormState = {
+  errors?: Record<string, string[]>;
+  message?: string;
+  createdId?: string;
+};
+
+function pickString(fd: FormData, key: string): string | undefined {
+  const v = fd.get(key);
+  if (typeof v !== "string") return undefined;
+  return v;
+}
+
+export async function createArtifactFormAction(
+  _prev: ArtifactFormState,
+  formData: FormData,
+): Promise<ArtifactFormState> {
+  const ownerKindRaw = pickString(formData, "ownerKind");
+  const ownerId = pickString(formData, "ownerId");
+  const stageRaw = pickString(formData, "stage");
+  const subkindRaw = pickString(formData, "subkind");
+  const kindRaw = pickString(formData, "kind");
+  const title = pickString(formData, "title") ?? "";
+
+  if (
+    ownerKindRaw !== "revision" &&
+    ownerKindRaw !== "build"
+  ) {
+    return { message: "Invalid owner kind." };
+  }
+  if (!ownerId) return { message: "Missing owner id." };
+  if (!stageRaw || !(stageRaw in Stage)) {
+    return { message: "Invalid stage." };
+  }
+  if (!subkindRaw || !(subkindRaw in ArtifactSubkind)) {
+    return { message: "Invalid subkind." };
+  }
+  if (kindRaw !== "NOTE" && kindRaw !== "LINK") {
+    return { message: "Invalid artifact kind." };
+  }
+
+  const base = {
+    owner: { kind: ownerKindRaw, id: ownerId },
+    stage: stageRaw as Stage,
+    subkind: subkindRaw as ArtifactSubkind,
+    title: title.trim(),
+  };
+
+  const payload =
+    kindRaw === "NOTE"
+      ? {
+          ...base,
+          kind: "NOTE" as const satisfies ArtifactKind,
+          noteBody: pickString(formData, "noteBody") ?? "",
+        }
+      : {
+          ...base,
+          kind: "LINK" as const satisfies ArtifactKind,
+          linkUrl: pickString(formData, "linkUrl") ?? "",
+        };
+
+  try {
+    const artifact = await createArtifact(payload);
+    return { createdId: artifact.id };
+  } catch (err) {
+    if (err instanceof ZodError) {
+      const errors: Record<string, string[]> = {};
+      for (const issue of err.issues) {
+        const key = issue.path.join(".") || "_root";
+        (errors[key] ??= []).push(issue.message);
+      }
+      return { errors };
+    }
+    return { message: err instanceof Error ? err.message : "Unknown error" };
+  }
 }
