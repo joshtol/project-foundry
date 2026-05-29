@@ -23,6 +23,7 @@ import {
 } from "./_commit-fields";
 import { BomEditor } from "./_bom-editor";
 import { ArtifactPicker } from "@/components/ArtifactPicker";
+import { ErrataPane } from "@/components/ErrataPane";
 
 type Params = { slug: string; revLabel: string };
 
@@ -97,6 +98,19 @@ export default async function RevisionDetailPage({
           select: { id: true, mpn: true, manufacturer: true },
         })
       : [];
+
+  // Errata pane (§9.1 bottom-right; Task 11.2) — same-project linkable revs
+  // are every revision under this project EXCEPT this one. The dropdown in
+  // the per-row Link form uses this; the linkErratumToRevision action
+  // re-checks server-side per design §12.1 (no DB CHECK, action-only).
+  const linkableRevisions = await db.revision.findMany({
+    where: {
+      projectId: project.id,
+      NOT: { id: revision.id },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, label: true },
+  });
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-10">
@@ -352,27 +366,19 @@ export default async function RevisionDetailPage({
             </div>
           </section>
 
-          <section className="border border-panel-border bg-navy-dark p-6">
-            <h2 className="font-display text-2xl tracking-wider text-white">
-              ERRATA
-            </h2>
-            {revision.errata.length === 0 ? (
-              <p className="mt-4 font-mono text-xs uppercase tracking-wider text-muted">
-                NO ERRATA.
-              </p>
-            ) : (
-              <ul className="mt-4 divide-y divide-panel-border">
-                {revision.errata.map((e) => (
-                  <li key={e.id} className="py-3 font-mono text-sm">
-                    <p className="text-link-muted">{e.title}</p>
-                    <p className="mt-1 font-mono text-xs uppercase tracking-wider text-muted">
-                      {e.severity} · {e.status}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <ErrataPane
+            projectSlug={project.slug}
+            revLabel={revision.label}
+            errata={revision.errata.map((e) => ({
+              id: e.id,
+              title: e.title,
+              description: e.description,
+              severity: e.severity,
+              status: e.status,
+              addressedByRevisionId: e.addressedByRevisionId,
+            }))}
+            linkableRevisions={linkableRevisions}
+          />
         </div>
       </div>
     </main>
